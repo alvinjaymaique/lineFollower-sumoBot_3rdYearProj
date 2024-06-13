@@ -24,24 +24,24 @@
 
 // Switch Mode
 #define switchMode 12
+bool mode = digitalRead(switchMode);
 
+// For Line Follower
 //PID properties
-const double Kp = 12.5; //14 //10
+const double Kp = 14; //14 //10
 const double Ki = 0.2; //0.2
-const double Kd = 12.5; //14 //10
-// int error = 0;
+const double Kd = 14; //14 //10
 double lastError = 0;
 double sumError = 0;
-// const int Goal = 1000;
-
-unsigned long startTime = 0;
-
-int defaultSpeed = 50; //39
+// unsigned long startTime = 0;
+int defaultSpeed = 75; //39
 const int Rspeed = defaultSpeed;
 const int Lspeed = defaultSpeed;
 float straight;
+// For Line Follower
 
 unsigned long prevMillis = 0;
+
 void setup() {
   // put your setup code here, to run once:
   // put your setup code here, to run once:
@@ -68,43 +68,60 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-
-  // int left = analogRead(leftIR);
-  // int center = analogRead(centerIR);
-  // int right = analogRead(rightIR);
-
-  // if(millis()-prevMillis >= 1000){
-  //   prevMillis = millis();
-  //   Serial.print("Left: ");
-  //   Serial.print(left);
-  //   Serial.print(" Center: ");
-  //   Serial.print(center);
-  //   Serial.print(" Right: ");
-  //   Serial.println(right);
-  // }
-
-  bool val_left = digitalRead(leftIR);
-  bool val_center = digitalRead(centerIR);
-  bool val_right = digitalRead(rightIR);
-  int error = readError(val_left, val_center, val_right);
-  Serial.println(error);
-  if(error < 3){
-    sumError = (lastError==error)?sumError+error:0;
-    straight = (error==0)?straight+0.0035:0;
-    int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError);
-    int lSpeed = constrain(straight+(defaultSpeed/1.9)+pid, 0, defaultSpeed); //defaultSpeed only
-    // int lSpeed = map(defaultSpeed+pid, 0, 100, 0, defaultSpeed); 
-    int rSpeed = constrain(straight+(defaultSpeed/1.9)-pid, 0, defaultSpeed); //defaultSpeed only
-    // int rSpeed =  map(defaultSpeed-pid, 0, 100, 0, defaultSpeed);
-    lastError = error;
-    forward(motor1Input1, motor1Input2, lSpeed, motor1Speed);
-    forward(motor2Input1, motor2Input2, rSpeed, motor2Speed);
-  }else{
-    stop(motor1Input1, motor1Input2, motor1Speed);
-    stop(motor2Input1, motor2Input2, motor2Speed);
+  while(mode){
+    //LineFollower
+    lineFollower();
   }
-  
+  while(!mode){
+    //Sumobot    
+  }
 }
+
+  void lineFollower(){
+    // int left = analogRead(leftIR);
+    // int center = analogRead(centerIR);
+    // int right = analogRead(rightIR);
+
+    // if(millis()-prevMillis >= 1000){
+    //   prevMillis = millis();
+    //   Serial.print("Left: ");
+    //   Serial.print(left);
+    //   Serial.print(" Center: ");
+    //   Serial.print(center);
+    //   Serial.print(" Right: ");
+    //   Serial.println(right);
+    // }
+
+    bool val_left = digitalRead(leftIR);
+    bool val_center = digitalRead(centerIR);
+    bool val_right = digitalRead(rightIR);
+    int error = readError(val_left, val_center, val_right);
+    Serial.println(error);
+    if(error < 3){
+      sumError = (lastError==error)?sumError+error:0;
+      straight = (error==0)?straight+0.007:0;
+      int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError);
+      int lSpeed = constrain(straight+(defaultSpeed/1.7)+pid, 0, defaultSpeed); //defaultSpeed only
+      // int lSpeed = map(defaultSpeed+pid, 0, 100, 0, defaultSpeed); 
+      int rSpeed = constrain(straight+(defaultSpeed/1.7)-pid, 0, defaultSpeed); //defaultSpeed only
+      lastError = error;
+      // int rSpeed =  map(defaultSpeed-pid, 0, 100, 0, defaultSpeed);
+      forward(motor1Input1, motor1Input2, lSpeed, motor1Speed);
+      forward(motor2Input1, motor2Input2, rSpeed, motor2Speed);
+      prevMillis=millis();
+    }else if(error == 3){
+      if(millis()-prevMillis >= 680){
+        reverse(motor1Input1, motor1Input2, defaultSpeed, motor1Speed);
+        reverse(motor2Input1, motor2Input2, defaultSpeed, motor2Speed);
+      }  
+    }
+    else{
+      if(millis()-prevMillis >= 400){
+        stop(motor1Input1, motor1Input2, motor1Speed);
+        stop(motor2Input1, motor2Input2, motor2Speed);
+      }  
+    }
+  }
 
   int readError(bool val_left, bool val_center, bool val_right) {
     if(val_left && !val_center && !val_right) return -2;
@@ -112,7 +129,8 @@ void loop() {
     else if(!val_left && val_center && !val_right) return 0;
     else if(!val_left && val_center && val_right) return 1;
     else if(!val_left && !val_center && val_right) return 2;
-    else if(val_left && val_center && val_right) return 3;
+    else if(val_left && val_center && val_right) return 4;
+    else if(!val_left && !val_center && !val_right) return 3;
   }
 
   void reverse(int a, int b, int speed, int pwm){
@@ -130,6 +148,3 @@ void loop() {
     digitalWrite(b,LOW);
     analogWrite(pwm, 0);
   }
-
-
-
