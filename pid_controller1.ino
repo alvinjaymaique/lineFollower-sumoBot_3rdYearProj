@@ -26,9 +26,9 @@
 #define switchMode 12
 
 //PID properties
-const double Kp = 14;
-const double Ki = 0.2;
-const double Kd = 14;
+const double Kp = 12.5; //14 //10
+const double Ki = 0.2; //0.2
+const double Kd = 12.5; //14 //10
 // int error = 0;
 double lastError = 0;
 double sumError = 0;
@@ -36,9 +36,12 @@ double sumError = 0;
 
 unsigned long startTime = 0;
 
-int defaultSpeed = 39; //38
+int defaultSpeed = 50; //39
 const int Rspeed = defaultSpeed;
 const int Lspeed = defaultSpeed;
+float straight;
+
+unsigned long prevMillis = 0;
 void setup() {
   // put your setup code here, to run once:
   // put your setup code here, to run once:
@@ -65,20 +68,34 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+
+  // int left = analogRead(leftIR);
+  // int center = analogRead(centerIR);
+  // int right = analogRead(rightIR);
+
+  // if(millis()-prevMillis >= 1000){
+  //   prevMillis = millis();
+  //   Serial.print("Left: ");
+  //   Serial.print(left);
+  //   Serial.print(" Center: ");
+  //   Serial.print(center);
+  //   Serial.print(" Right: ");
+  //   Serial.println(right);
+  // }
+
   bool val_left = digitalRead(leftIR);
   bool val_center = digitalRead(centerIR);
   bool val_right = digitalRead(rightIR);
   int error = readError(val_left, val_center, val_right);
-  if(error < 3){\
-    // if(lastError==error){
-    //   sumError += error;
-    // }else{
-    //   sumError = 0;
-    // }
+  Serial.println(error);
+  if(error < 3){
     sumError = (lastError==error)?sumError+error:0;
+    straight = (error==0)?straight+0.0035:0;
     int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError);
-    int lSpeed = constrain(defaultSpeed+pid, 0, defaultSpeed);
-    int rSpeed = constrain(defaultSpeed-pid, 0, defaultSpeed);
+    int lSpeed = constrain(straight+(defaultSpeed/1.9)+pid, 0, defaultSpeed); //defaultSpeed only
+    // int lSpeed = map(defaultSpeed+pid, 0, 100, 0, defaultSpeed); 
+    int rSpeed = constrain(straight+(defaultSpeed/1.9)-pid, 0, defaultSpeed); //defaultSpeed only
+    // int rSpeed =  map(defaultSpeed-pid, 0, 100, 0, defaultSpeed);
     lastError = error;
     forward(motor1Input1, motor1Input2, lSpeed, motor1Speed);
     forward(motor2Input1, motor2Input2, rSpeed, motor2Speed);
