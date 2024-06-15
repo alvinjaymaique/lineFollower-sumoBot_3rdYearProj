@@ -25,8 +25,10 @@
 // Switch Mode
 #define calibrationPin 11
 #define switchMode 12
-bool mode = digitalRead(switchMode);
-bool isNotCalibration = digitalRead(calibrationPin);
+
+bool mode; 
+bool isNotCalibration;
+
 // For Line Follower
 //PID properties
 const double Kp = 14; //14 //10
@@ -35,10 +37,11 @@ const double Kd = 14; //14 //10
 double lastError = 0;
 double sumError = 0;
 // unsigned long startTime = 0;
-int maxSpeed = 100; //39
+int maxSpeed = 89; //80
 const int Rspeed = maxSpeed;
 const int Lspeed = maxSpeed;
 float straight;
+bool onTurbo = true;
 
 short sensorMin1 = 1023;   // minimum sensor value
 short sensorMin2 = 1023;
@@ -58,6 +61,7 @@ short rightMedian = 0;
 
 // For Sumobot
 int duration, cm;
+bool isDetected = false;
 
 unsigned long prevMillis = 0;
 
@@ -85,6 +89,9 @@ void setup() {
   pinMode(switchMode, INPUT_PULLUP);
   pinMode(calibrationPin, INPUT_PULLUP);
 
+  mode = digitalRead(switchMode);
+  isNotCalibration = digitalRead(calibrationPin);
+
   // Setup Ultrasonic sensors
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -94,12 +101,18 @@ void loop() {
   // put your main code here, to run repeatedly:
   while(mode){
     //LineFollower
+    // readUltrasonic();
     if(isNotCalibration){
-      if(millis() <= 100){
+      if(onTurbo){
+      onTurbo = false;
       forward(motor1Input1, motor1Input2, 100, motor1Speed);
       forward(motor2Input1, motor2Input2, 100, motor2Speed);
+      delay(100);
       }
-      lineFollower(); 
+      // else{
+      //   lineFollower(); 
+      // }
+    lineFollower(); 
     }else{
       isNotCalibration = digitalRead(calibrationPin);
       calibrate(); 
@@ -119,20 +132,22 @@ void loop() {
 // Sumobot
 void sumoBot(){
   readUltrasonic();
-  Serial.println(cm);
+  // Serial.println(cm);
   if (cm > 1 && cm < 50) { 
-    forward(motor1Input1, motor1Input2, maxSpeed, motor1Speed);
-    forward(motor2Input1, motor2Input2, maxSpeed, motor2Speed);
+    forward(motor1Input1, motor1Input2, maxSpeed-50, motor1Speed);
+    forward(motor2Input1, motor2Input2, maxSpeed-50, motor2Speed);
     delay(300);
   } else {              
-    reverse(motor1Input1, motor1Input2, maxSpeed, motor1Speed);
-    forward(motor2Input1, motor2Input2, maxSpeed, motor2Speed);
+    reverse(motor1Input1, motor1Input2, maxSpeed-50, motor1Speed);
+    forward(motor2Input1, motor2Input2, maxSpeed-50, motor2Speed);
     delay(10);
   }
+
+
 }
 
 // For Sumobot Ultrasonic sensor
-void readUltrasonic() {
+bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
@@ -140,6 +155,26 @@ void readUltrasonic() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
   cm = (duration/2) / 29;
+  if(cm>77/2){
+    cm = 0;
+  }
+  Serial.print("duration: ");
+  Serial.println(duration);
+  Serial.print("cm: ");
+  Serial.println(cm);
+
+}
+
+void searchEnemy(){
+  if(isDetected){
+    forward(motor1Input1, motor1Input2, 30, motor1Speed);
+    forward(motor2Input1, motor2Input2, 30, motor2Speed);
+  }else{
+    isDetected = readUltrasonic();
+    forward(motor1Input1, motor1Input2, 70, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 70, motor2Speed);
+  }
+
 }
 
 void lineFollower(){
@@ -147,19 +182,15 @@ void lineFollower(){
   short center = analogRead(centerIR);
   short right = analogRead(rightIR);
 
-  // if(millis()-prevMillis >= 1000){
-  //   prevMillis = millis();
-  //   Serial.print("Left: ");
-  //   Serial.print(left);
-  //   Serial.print(" Center: ");
-  //   Serial.print(center);
-  //   Serial.print(" Right: ");
-  //   Serial.println(right);
-  // }
-
-  // bool val_left = analogToDigital(left, leftMedian);
-  // bool val_center = analogToDigital(center, centerMedian);
-  // bool val_right = analogToDigital(right, rightMedian);
+  if(millis()-prevMillis >= 1000){
+    prevMillis = millis();
+    Serial.print("Left: ");
+    Serial.print(left);
+    Serial.print(" Center: ");
+    Serial.print(center);
+    Serial.print(" Right: ");
+    Serial.println(right);
+  }
 
   // bool val_left = digitalRead(leftIR);
   // bool val_center = digitalRead(centerIR);
@@ -172,13 +203,13 @@ void lineFollower(){
   if(error < 3){
     sumError = (lastError==error)?sumError+error:0;
     // sumError += error;
-    straight = (error==0)?straight+0.015:0;
+    straight = (error==0)?straight+0.02:0;
     // straight = 0;
-    int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError);
+    int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError)+20;
     // pid = (lastError==error)?pid=0.01:pid;
-    int lSpeed = constrain(straight+(maxSpeed/2.5)+pid, 0, maxSpeed); //maxSpeed only /3
+    int lSpeed = constrain(straight+(maxSpeed/3)+pid, 0, maxSpeed); //maxSpeed only /3
     // int lSpeed = map(maxSpeed+pid, 0, 100, 0, maxSpeed); 
-    int rSpeed = constrain(straight+(maxSpeed/2.5)-pid, 0, maxSpeed); //maxSpeed only /3
+    int rSpeed = constrain(straight+(maxSpeed/3)-pid, 0, maxSpeed); //maxSpeed only /3
     lastError = error;
     // int rSpeed =  map(maxSpeed-pid, 0, 100, 0, maxSpeed);
     forward(motor1Input1, motor1Input2, lSpeed, motor1Speed);
@@ -188,10 +219,21 @@ void lineFollower(){
     if(millis()-prevMillis >= 680){
       reverse(motor1Input1, motor1Input2, maxSpeed, motor1Speed);
       reverse(motor2Input1, motor2Input2, maxSpeed, motor2Speed);
-    }  
+    } 
+    // if(lastError==3){
+    //   reverse(motor1Input1, motor1Input2, maxSpeed, motor1Speed);
+    //   reverse(motor2Input1, motor2Input2, maxSpeed, motor2Speed);
+    // } 
+    // else if(lastError<0){
+    //   forward(motor1Input1, motor1Input2, 0, motor1Speed);
+    //   forward(motor2Input1, motor2Input2, maxSpeed, motor2Speed);
+    // }else if(lastError>0){
+    //   forward(motor1Input1, motor1Input2, maxSpeed, motor1Speed);
+    //   forward(motor2Input1, motor2Input2, 0, motor2Speed);
+    // }
   }
   else{
-    if(millis()-prevMillis >= 45){
+    if(millis()-prevMillis >= 200){
       stop(motor1Input1, motor1Input2, motor1Speed);
       stop(motor2Input1, motor2Input2, motor2Speed);
     }  
@@ -205,7 +247,7 @@ bool analogToDigital(short value, short median){
 
 // For Line follower 
 void calibrate(){
-  if(millis()<=5000){
+  if(millis()<=2500){
     forward(motor1Input1, motor1Input2, 70, motor1Speed);
     reverse(motor2Input1, motor2Input2, 70, motor2Speed);
   }else{
@@ -251,6 +293,7 @@ void calibrate(){
   if (sensorValue3 < sensorMin3) {
     sensorMin3 = sensorValue3;
   }
+  delay(10);
 }
 
 int readError(short val_left, short val_center, short val_right) {
