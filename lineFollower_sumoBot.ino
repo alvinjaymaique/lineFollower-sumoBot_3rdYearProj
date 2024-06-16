@@ -62,6 +62,7 @@ short rightMedian = 0;
 // For Sumobot
 int duration, cm;
 bool isDetected = false;
+static bool prevDetected = isDetected;
 
 unsigned long prevMillis = 0;
 
@@ -121,9 +122,9 @@ void loop() {
   }
   while(!mode){
     //Sumobot  
-    if(millis() <= 5000){
-      delay(5000); 
-    }  
+    // if(millis() <= 5000){
+    //   delay(5000); 
+    // }  
     sumoBot();
   }
 }
@@ -131,22 +132,12 @@ void loop() {
 
 // Sumobot
 void sumoBot(){
-  readUltrasonic();
-  // Serial.println(cm);
-  if (cm > 1 && cm < 50) { 
-    forward(motor1Input1, motor1Input2, maxSpeed-50, motor1Speed);
-    forward(motor2Input1, motor2Input2, maxSpeed-50, motor2Speed);
-    delay(300);
-  } else {              
-    reverse(motor1Input1, motor1Input2, maxSpeed-50, motor1Speed);
-    forward(motor2Input1, motor2Input2, maxSpeed-50, motor2Speed);
-    delay(10);
-  }
-
-
+  
+  searchEnemy();
 }
 
 // For Sumobot Ultrasonic sensor
+short cmThreshold = 20;
 bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -155,25 +146,57 @@ bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
   cm = (duration/2) / 29;
-  if(cm>77/2){
-    cm = 0;
+  if(cm>cmThreshold){
+    cm = 10000;
   }
-  Serial.print("duration: ");
-  Serial.println(duration);
-  Serial.print("cm: ");
-  Serial.println(cm);
-
+  // Serial.print("duration: ");
+  // Serial.println(duration);
+  // Serial.print("cm: ");
+  // Serial.println(cm);
+  return (cm<=cmThreshold);
 }
 
 void searchEnemy(){
-  if(isDetected){
-    forward(motor1Input1, motor1Input2, 30, motor1Speed);
-    forward(motor2Input1, motor2Input2, 30, motor2Speed);
-  }else{
+   if (millis() - prevMillis >= 25) {
     isDetected = readUltrasonic();
+    prevMillis = millis();  // Update prevMillis for next check
+  }
+  
+  Serial.print("duration: ");
+  Serial.print(duration);
+  Serial.print(" cm: ");
+  Serial.print(cm);
+  Serial.print(" isDetected: ");
+  Serial.println(isDetected);
+  
+  if (isDetected) {
+    if (!prevDetected && cm > 5) {
+      // Enemy detected for the first time
+      Serial.println("Inside the rising edge");
+      stop(motor1Input1, motor1Input2, motor1Speed);
+      stop(motor2Input1, motor2Input2, motor2Speed);
+      delay(100);
+      reverse(motor1Input1, motor1Input2, 70, motor1Speed);
+      forward(motor2Input1, motor2Input2, 70, motor2Speed);
+      delay(160);
+      stop(motor1Input1, motor1Input2, motor1Speed);
+      stop(motor2Input1, motor2Input2, motor2Speed);
+      delay(200);
+    }
+
+    // Move forward when enemy is detected
+    forward(motor1Input1, motor1Input2, 100, motor1Speed);
+    forward(motor2Input1, motor2Input2, 100, motor2Speed);
+  } else {
+    // No enemy detected, adjust movement accordingly
+    // stop(motor1Input1, motor1Input2, motor1Speed);
+    // stop(motor2Input1, motor2Input2, motor2Speed);
+    // delay(100);
     forward(motor1Input1, motor1Input2, 70, motor1Speed);
     reverse(motor2Input1, motor2Input2, 70, motor2Speed);
   }
+
+  prevDetected = isDetected;
 
 }
 
