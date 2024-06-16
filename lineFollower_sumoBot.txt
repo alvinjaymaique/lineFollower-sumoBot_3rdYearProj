@@ -37,7 +37,7 @@ const double Kd = 14; //14 //10
 double lastError = 0;
 double sumError = 0;
 // unsigned long startTime = 0;
-int maxSpeed = 89; //80
+int maxSpeed = 80; //80
 const int Rspeed = maxSpeed;
 const int Lspeed = maxSpeed;
 float straight;
@@ -60,11 +60,14 @@ short centerMedian = 0;
 short rightMedian = 0;
 
 // For Sumobot
-int duration, cm;
+unsigned int duration, cm;
 bool isDetected = false;
 static bool prevDetected = isDetected;
 
 unsigned long prevMillis = 0;
+unsigned long prevMillisReadIR = 0;
+unsigned long prevMillisMove = 0;
+unsigned long moveDuration = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -97,7 +100,6 @@ void setup() {
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 }
-
 void loop() {
   // put your main code here, to run repeatedly:
   while(mode){
@@ -124,49 +126,72 @@ void loop() {
     sumoBot();
   }
 }
-
-
 // Sumobot
 void sumoBot(){
+  // bool val_left = 0;
+  // bool val_center = 0;
+  // bool val_right = 0;
+  // if(millis()-prevMillisReadIR >= 25){
+  //   val_left = digitalRead(leftIR);
+  //   val_center = digitalRead(centerIR);
+  //   val_right = digitalRead(rightIR);
+  // }
+
   bool val_left = digitalRead(leftIR);
   bool val_center = digitalRead(centerIR);
   bool val_right = digitalRead(rightIR);
-  // int error = readErrorBool(val_left, val_center, val_right)
-  Serial.print("Left: ");
-  Serial.print(val_left);
-  Serial.print(" Center: ");
-  Serial.print(val_center);
-  Serial.print(" Right: ");
-  Serial.println(val_right);
+  
+  // Serial.print("Left: ");
+  // Serial.print(val_left);
+  // Serial.print(" Center: ");
+  // Serial.print(val_center);
+  // Serial.print(" Right: ");
+  // Serial.println(val_right);
   
   if(!val_left && val_center && val_right){
     reverse(motor1Input1, motor1Input2, 100, motor1Speed);
-    reverse(motor2Input1, motor2Input2, 70, motor2Speed);
-    delay(1000);
+    reverse(motor2Input1, motor2Input2, 60, motor2Speed);
+    delay(600);
   }else if (!val_left && !val_center && val_right) {
     reverse(motor1Input1, motor1Input2, 100, motor1Speed);
     reverse(motor2Input1, motor2Input2, 80, motor2Speed);
-    delay(1000);
+    delay(600);
   }else if (!val_left && !val_center && !val_right) {
     reverse(motor1Input1, motor1Input2, 100, motor1Speed);
     reverse(motor2Input1, motor2Input2, 100, motor2Speed);
-    delay(1000);
+    delay(600);
   }else if (val_left && !val_center && !val_right) {
     reverse(motor1Input1, motor1Input2, 80, motor1Speed);
     reverse(motor2Input1, motor2Input2, 100, motor2Speed);
-    delay(1000);
+    delay(600);
   }else if (val_left && val_center && !val_right) {
-    reverse(motor1Input1, motor1Input2, 70, motor1Speed);
+    reverse(motor1Input1, motor1Input2, 60, motor1Speed);
     reverse(motor2Input1, motor2Input2, 100, motor2Speed);
-    delay(1000);
+    delay(600);
   }else if(val_left && val_center && val_right){
     searchEnemy();
+    if(millis()-prevMillisMove >= 2000){
+      prevMillisMove=millis();
+      moveDuration=10;
+    }
+    if(moveDuration>0){
+      moveDuration--;
+      forward(motor1Input1, motor1Input2, 70, motor1Speed);
+      forward(motor2Input1, motor2Input2, 70, motor2Speed);
+      // Serial.print("Forward: ");
+      // Serial.println(moveDuration);
+    }
+    delay(25);
+  } 
+  else{
+    reverse(motor1Input1, motor1Input2, 100, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 100, motor2Speed);
+    delay(600);
   }
-  
+  // searchEnemy();
 }
-
 // For Sumobot Ultrasonic sensor
-short cmThreshold = 20;
+short CmThreshold = 20; short AdditionalSpeed=100; short SumoSpeed; //Change AdditionalSpeed to 155
 bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -175,30 +200,28 @@ bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
   cm = (duration/2) / 29;
-  if(cm>cmThreshold){
-    cm = 10000;
+  if(cm>CmThreshold){
+    cm = 0;
   }
   // Serial.print("duration: ");
   // Serial.println(duration);
   // Serial.print("cm: ");
   // Serial.println(cm);
-  return (cm<=cmThreshold);
+  return (cm<=CmThreshold && cm>0);
 }
-
 void searchEnemy(){
-   if (millis() - prevMillis >= 25) {
+   if (millis() - prevMillis >= 50) {
     isDetected = readUltrasonic();
     prevMillis = millis();  // Update prevMillis for next check
   }
   
-  /*Debugging
+  // //Debugging
   // Serial.print("duration: ");
   // Serial.print(duration);
   // Serial.print(" cm: ");
   // Serial.print(cm);
   // Serial.print(" isDetected: ");
   // Serial.println(isDetected);
-  */
   
   if (isDetected) {
     if (!prevDetected && cm > 5) {
@@ -209,15 +232,19 @@ void searchEnemy(){
       delay(100);
       reverse(motor1Input1, motor1Input2, 70, motor1Speed);
       forward(motor2Input1, motor2Input2, 70, motor2Speed);
-      delay(160);
+      delay(170);
       stop(motor1Input1, motor1Input2, motor1Speed);
       stop(motor2Input1, motor2Input2, motor2Speed);
       delay(200);
     }
-
     // Move forward when enemy is detected
-    forward(motor1Input1, motor1Input2, 100, motor1Speed);
-    forward(motor2Input1, motor2Input2, 100, motor2Speed);
+    // SumoSpeed = (cm>0)?AdditionalSpeed/cm:0;
+    AdditionalSpeed = (cm<7)?155:0;
+    if(isDetected)
+    forward(motor1Input1, motor1Input2, 100+AdditionalSpeed, motor1Speed);
+    forward(motor2Input1, motor2Input2, 100+AdditionalSpeed, motor2Speed);
+    // forward(motor1Input1, motor1Input2, 100, motor1Speed);
+    // forward(motor2Input1, motor2Input2, 100, motor2Speed);
   } else {
     // No enemy detected, adjust movement accordingly
     // stop(motor1Input1, motor1Input2, motor1Speed);
@@ -228,9 +255,18 @@ void searchEnemy(){
   }
 
   prevDetected = isDetected;
-
+}
+int readErrorBool(bool val_left, bool val_center, bool val_right) {
+  if(val_left && !val_center && !val_right) return -2; //Detect left only
+  else if(val_left && val_center && !val_right) return -1; //Detect left and center
+  else if(!val_left && val_center && !val_right) return 0; //Detect center
+  else if(!val_left && val_center && val_right) return 1; //Detect right and center
+  else if(!val_left && !val_center && val_right) return 2; //Detect right only
+  else if(!val_left && !val_center && !val_right) return 3; //No Detection
+  else if(val_left && val_center && val_right) return 4; //Detect all black
 }
 
+// Line follower
 void lineFollower(){
   short left = analogRead(leftIR);
   short center = analogRead(centerIR);
@@ -257,13 +293,13 @@ void lineFollower(){
   if(error < 3){
     sumError = (lastError==error)?sumError+error:0;
     // sumError += error;
-    straight = (error==0)?straight+0.02:0;
+    straight = (error==0)?straight+0.03:0;
     // straight = 0;
     int pid = Kp*error + (Ki*sumError) +Kd*(error-lastError)+20;
     // pid = (lastError==error)?pid=0.01:pid;
-    int lSpeed = constrain(straight+(maxSpeed/3)+pid, 0, maxSpeed); //maxSpeed only /3
+    int lSpeed = constrain(straight+(maxSpeed/3.5)+pid, 0, maxSpeed); //maxSpeed only /3
     // int lSpeed = map(maxSpeed+pid, 0, 100, 0, maxSpeed); 
-    int rSpeed = constrain(straight+(maxSpeed/3)-pid, 0, maxSpeed); //maxSpeed only /3
+    int rSpeed = constrain(straight+(maxSpeed/3.5)-pid, 0, maxSpeed); //maxSpeed only /3
     lastError = error;
     // int rSpeed =  map(maxSpeed-pid, 0, 100, 0, maxSpeed);
     forward(motor1Input1, motor1Input2, lSpeed, motor1Speed);
@@ -293,13 +329,10 @@ void lineFollower(){
     }  
   }
 }
-
 bool analogToDigital(short value, short median){
   bool digital = (value>median)?1:0;
   return digital;
-}
-
-// For Line follower 
+} 
 void calibrate(){
   if(millis()<=2500){
     forward(motor1Input1, motor1Input2, 70, motor1Speed);
@@ -349,7 +382,6 @@ void calibrate(){
   }
   delay(10);
 }
-
 int readError(short val_left, short val_center, short val_right) {
   if(val_left>leftMedian && val_center<=centerMedian && val_right<=rightMedian) return -2; //Detect left only
   else if(val_left>leftMedian && val_center>centerMedian && val_right<=rightMedian) return -1; //Detect left and center
@@ -358,16 +390,6 @@ int readError(short val_left, short val_center, short val_right) {
   else if(val_left<=leftMedian && val_center<=centerMedian && val_right>rightMedian) return 2; //Detect right only
   else if(val_left<=leftMedian && val_center<=centerMedian && val_right<=rightMedian) return 3; //No Detection
   else if(val_left>leftMedian && val_center>centerMedian && val_right>rightMedian) return 4; //Detect all black
-}
-
-int readErrorBool(bool val_left, bool val_center, bool val_right) {
-  if(val_left && !val_center && !val_right) return -2; //Detect left only
-  else if(val_left && val_center && !val_right) return -1; //Detect left and center
-  else if(!val_left && val_center && !val_right) return 0; //Detect center
-  else if(!val_left && val_center && val_right) return 1; //Detect right and center
-  else if(!val_left && !val_center && val_right) return 2; //Detect right only
-  else if(!val_left && !val_center && !val_right) return 3; //No Detection
-  else if(val_left && val_center && val_right) return 4; //Detect all black
 }
 
 void reverse(int a, int b, int speed, int pwm){
