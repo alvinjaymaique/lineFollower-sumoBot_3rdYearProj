@@ -110,21 +110,17 @@ void loop() {
       forward(motor2Input1, motor2Input2, 100, motor2Speed);
       delay(100);
       }
-      // else{
-      //   lineFollower(); 
-      // }
     lineFollower(); 
     }else{
       isNotCalibration = digitalRead(calibrationPin);
       calibrate(); 
     } 
-    // lineFollower();
   }
   while(!mode){
     //Sumobot  
-    // if(millis() <= 5000){
-    //   delay(5000); 
-    // }  
+    if(millis() <= 5000){
+      delay(5000); 
+    }  
     sumoBot();
   }
 }
@@ -132,8 +128,41 @@ void loop() {
 
 // Sumobot
 void sumoBot(){
+  bool val_left = digitalRead(leftIR);
+  bool val_center = digitalRead(centerIR);
+  bool val_right = digitalRead(rightIR);
+  // int error = readErrorBool(val_left, val_center, val_right)
+  Serial.print("Left: ");
+  Serial.print(val_left);
+  Serial.print(" Center: ");
+  Serial.print(val_center);
+  Serial.print(" Right: ");
+  Serial.println(val_right);
   
-  searchEnemy();
+  if(!val_left && val_center && val_right){
+    reverse(motor1Input1, motor1Input2, 100, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 70, motor2Speed);
+    delay(1000);
+  }else if (!val_left && !val_center && val_right) {
+    reverse(motor1Input1, motor1Input2, 100, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 80, motor2Speed);
+    delay(1000);
+  }else if (!val_left && !val_center && !val_right) {
+    reverse(motor1Input1, motor1Input2, 100, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 100, motor2Speed);
+    delay(1000);
+  }else if (val_left && !val_center && !val_right) {
+    reverse(motor1Input1, motor1Input2, 80, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 100, motor2Speed);
+    delay(1000);
+  }else if (val_left && val_center && !val_right) {
+    reverse(motor1Input1, motor1Input2, 70, motor1Speed);
+    reverse(motor2Input1, motor2Input2, 100, motor2Speed);
+    delay(1000);
+  }else if(val_left && val_center && val_right){
+    searchEnemy();
+  }
+  
 }
 
 // For Sumobot Ultrasonic sensor
@@ -162,17 +191,19 @@ void searchEnemy(){
     prevMillis = millis();  // Update prevMillis for next check
   }
   
-  Serial.print("duration: ");
-  Serial.print(duration);
-  Serial.print(" cm: ");
-  Serial.print(cm);
-  Serial.print(" isDetected: ");
-  Serial.println(isDetected);
+  /*Debugging
+  // Serial.print("duration: ");
+  // Serial.print(duration);
+  // Serial.print(" cm: ");
+  // Serial.print(cm);
+  // Serial.print(" isDetected: ");
+  // Serial.println(isDetected);
+  */
   
   if (isDetected) {
     if (!prevDetected && cm > 5) {
       // Enemy detected for the first time
-      Serial.println("Inside the rising edge");
+      // Serial.println("Inside the rising edge");
       stop(motor1Input1, motor1Input2, motor1Speed);
       stop(motor2Input1, motor2Input2, motor2Speed);
       delay(100);
@@ -329,15 +360,15 @@ int readError(short val_left, short val_center, short val_right) {
   else if(val_left>leftMedian && val_center>centerMedian && val_right>rightMedian) return 4; //Detect all black
 }
 
-// int readError(bool val_left, bool val_center, bool val_right) {
-//   if(val_left && !val_center && !val_right) return -2; //Detect left only
-//   else if(val_left && val_center && !val_right) return -1; //Detect left and center
-//   else if(!val_left && val_center && !val_right) return 0; //Detect center
-//   else if(!val_left && val_center && val_right) return 1; //Detect right and center
-//   else if(!val_left && !val_center && val_right) return 2; //Detect right only
-//   else if(!val_left && !val_center && !val_right) return 3; //No Detection
-//   else if(val_left && val_center && val_right) return 4; //Detect all black
-// }
+int readErrorBool(bool val_left, bool val_center, bool val_right) {
+  if(val_left && !val_center && !val_right) return -2; //Detect left only
+  else if(val_left && val_center && !val_right) return -1; //Detect left and center
+  else if(!val_left && val_center && !val_right) return 0; //Detect center
+  else if(!val_left && val_center && val_right) return 1; //Detect right and center
+  else if(!val_left && !val_center && val_right) return 2; //Detect right only
+  else if(!val_left && !val_center && !val_right) return 3; //No Detection
+  else if(val_left && val_center && val_right) return 4; //Detect all black
+}
 
 void reverse(int a, int b, int speed, int pwm){
   digitalWrite(a,HIGH);
