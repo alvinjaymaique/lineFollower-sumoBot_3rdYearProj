@@ -4,6 +4,10 @@
 // L298n Driver ENA=6 IN1=5 IN2=4 IN3=8 IN4=7 ENB=9
 // Switch Mode 12 and/or 11
 
+// DDRC = 1100_0001;
+// DDRD = 1111_1111;
+// DDRB = 1111_1111;
+
 // Motors
 #define motor1Speed 6
 #define motor1Input1 5
@@ -62,7 +66,7 @@ short centerMedian = 0;
 short rightMedian = 0;
 
 // For Sumobot
-unsigned int duration, cm;
+unsigned int duration, cm, prevCm;
 bool isDetected = false;
 static bool prevDetected = isDetected;
 
@@ -128,9 +132,6 @@ void loop() {
       prevIsSumobot = false;
       delay(5000); 
     }
-    // if(millis() <= 5000){
-    //   delay(5000); 
-    // }  
     sumoBot();
     // searchEnemy();
     isSumobot = digitalRead(sumoBotPin);
@@ -141,22 +142,9 @@ void loop() {
 }
 // Sumobot
 void sumoBot(){
-  // bool val_left = 0;
-  // bool val_center = 0;
-  // bool val_right = 0;
-  // if(millis()-prevMillisReadIR >= 25){
-  //   val_left = digitalRead(leftIR);
-  //   val_center = digitalRead(centerIR);
-  //   val_right = digitalRead(rightIR);
-  // }
-
   bool val_left = digitalRead(leftIR);
   bool val_center = digitalRead(centerIR);
   bool val_right = digitalRead(rightIR);
-
-  // int val_left = analogRead(leftIR);
-  // int val_center = analogRead(centerIR);
-  // int val_right = analogRead(rightIR);
   
   // Serial.print("Left: ");
   // Serial.print(val_left);
@@ -191,12 +179,12 @@ void sumoBot(){
       prevMillisMove=millis();
       moveDuration=6;
     }
-    if(moveDuration>0){
-      moveDuration--;
+    if(moveDuration>0 && !isDetected){
       forward(motor1Input1, motor1Input2, 70, motor1Speed);
       forward(motor2Input1, motor2Input2, 70, motor2Speed);
       // Serial.print("Forward: ");
       // Serial.println(moveDuration);
+      moveDuration--;
     }
     delay(25);
   } 
@@ -208,7 +196,7 @@ void sumoBot(){
   // searchEnemy();
 }
 // For Sumobot Ultrasonic sensor
-short CmThreshold = 8; short AdditionalSpeed=155; short SumoSpeed; // /CmThreshold=38 /Change AdditionalSpeed to 155
+short CmThreshold = 50; short AdditionalSpeed=155; short SumoSpeed; // /CmThreshold=40 /Change AdditionalSpeed to 155
 bool readUltrasonic() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -220,6 +208,8 @@ bool readUltrasonic() {
   if(cm>CmThreshold){
     cm = 0;
   }
+
+  prevCm = cm;
   // Serial.print("duration: ");
   // Serial.println(duration);
   // Serial.print("cm: ");
@@ -246,13 +236,17 @@ void searchEnemy(){
       // Serial.println("Inside the rising edge");
       stop(motor1Input1, motor1Input2, motor1Speed);
       stop(motor2Input1, motor2Input2, motor2Speed);
-      delay(100);
+      delay(10);
       reverse(motor1Input1, motor1Input2, 70, motor1Speed);
       forward(motor2Input1, motor2Input2, 70, motor2Speed);
-      delay(160);
+      delay(140);
       stop(motor1Input1, motor1Input2, motor1Speed);
       stop(motor2Input1, motor2Input2, motor2Speed);
-      delay(200);
+      delay(10);
+    }else if (!prevDetected && prevCm<=8 && cm==0) {
+      AdditionalSpeed = (prevCm<=8 && cm==0)?155:0;
+      forward(motor1Input1, motor1Input2, 100+AdditionalSpeed, motor1Speed);
+      forward(motor2Input1, motor2Input2, 100+AdditionalSpeed, motor2Speed);
     }
     // Move forward when enemy is detected
     // SumoSpeed = (cm>0)?AdditionalSpeed/cm:0;
@@ -264,9 +258,6 @@ void searchEnemy(){
     // forward(motor2Input1, motor2Input2, 100, motor2Speed);
   } else {
     // No enemy detected, adjust movement accordingly
-    // stop(motor1Input1, motor1Input2, motor1Speed);
-    // stop(motor2Input1, motor2Input2, motor2Speed);
-    // delay(100);
     forward(motor1Input1, motor1Input2, 70, motor1Speed);
     reverse(motor2Input1, motor2Input2, 70, motor2Speed);
   }
@@ -345,9 +336,4 @@ void stop(int a, int b,int pwm){
   digitalWrite(b,LOW);
   analogWrite(pwm, 0);
 }
-
-
-
-
-
 
